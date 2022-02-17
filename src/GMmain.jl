@@ -3,14 +3,16 @@
 
 println("""\nAlgorithme "Gravity machine" --------------------------------\n""")
 
-const verbose = false
+const verbose = true
 const graphic = true
+const generateurVisualise = -1
+const normalise = true
+const projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random
 verbose ? println("  Fait \n") : nothing
 
-generateurVisualise = -1
 
 # ==============================================================================
 
@@ -281,8 +283,8 @@ end
 
 # ==============================================================================
 # Calcule la direction d'interet du nadir vers le milieu de segment reliant deux points generateurs
-function calculerDirections(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
-    # function calculerDirections(L, vg::Vector{tGenerateur})
+function calculerDirections_milieu(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
+    # function calculerDirections_milieu(L, vg::Vector{tGenerateur})
  
      nbgen = size(vg,1)
      λ1=Vector{Float64}(undef, nbgen - 1)
@@ -318,8 +320,8 @@ function calculerDirections(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateu
 
 # ==============================================================================
 # Calcule la direction d'interet du nadir vers un point generateur
-function calculerDirections2(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
-    #function calculerDirections2(L, vg::Vector{tGenerateur})
+function calculerDirections_generateur(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
+    #function calculerDirections_generateur(L, vg::Vector{tGenerateur})
 
     nbgen = size(vg,1)
     λ1=Vector{Float64}(undef, nbgen)
@@ -331,6 +333,49 @@ function calculerDirections2(L::Vector{tSolution{Float64}}, vg::Vector{tGenerate
 
         xm=vg[k].sRel.y[1]
         ym=vg[k].sRel.y[2]
+        Δx = abs(n1-xm)
+        Δy = abs(n2-ym)
+        λ1[k] =  1 - Δx / (Δx+Δy)
+        λ2[k] =  1 - Δy / (Δx+Δy)
+        @printf("  k= %3d   ",k)
+        @printf("  xm= %7.2f   ym= %7.2f ",xm,ym)
+        @printf("  Δx= %8.2f    Δy= %8.2f ",Δx,Δy)
+        @printf("  λ1= %6.5f    λ2= %6.5f \n",λ1[k],λ2[k])
+        if generateurVisualise == -1 
+            # affichage pour tous les generateurs
+            plot(n1, n2, xm, ym, linestyle="-", color="blue", marker="+")
+            annotate("",
+                     xy=[xm;ym],# Arrow tip
+                     xytext=[n1;n2], # Text offset from tip
+                     arrowprops=Dict("arrowstyle"=>"->"))        
+        elseif generateurVisualise == k
+            # affichage seulement pour le generateur k
+            plot(n1, n2, xm, ym, linestyle="-", color="blue", marker="+")
+            annotate("",
+                     xy=[xm;ym],# Arrow tip
+                     xytext=[n1;n2], # Text offset from tip
+                     arrowprops=Dict("arrowstyle"=>"->"))        
+        end 
+        #println("")
+    end
+    return λ1, λ2
+end
+ 
+
+# ==============================================================================
+# Calcule la direction d'interet du nadir vers un point generateur (version normalisée)
+function calculerDirections_generateur_normalise(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
+
+    nbgen = size(vg,1)
+    λ1=Vector{Float64}(undef, nbgen)
+    λ2=Vector{Float64}(undef, nbgen)
+    for k in 1:nbgen
+
+        n1 = 1 #L[end].y[1]
+        n2 = 1 #L[1].y[2]
+
+        xm= vg[k].sRel.y[1] / L[end].y[1]
+        ym= vg[k].sRel.y[2] / L[1].y[2]
         Δx = abs(n1-xm)
         Δy = abs(n2-ym)
         λ1[k] =  1 - Δx / (Δx+Δy)
@@ -459,7 +504,16 @@ function GM( fname::String,
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # calcule les directions (λ1,λ2) pour chaque generateur a utiliser lors des projections
-    λ1,λ2 = calculerDirections2(L,vg)
+
+    if projectionMode == 2
+        λ1,λ2 = calculerDirections_milieu(L,vg)
+    else if projectionMode == 3
+        if normalise
+            λ1,λ2 = calculerDirections_generateur_normalise(L,vg)
+        else
+            λ1,λ2 = calculerDirections_generateur(L,vg)
+        end
+    end
 
     # ==========================================================================
 
@@ -487,7 +541,7 @@ function GM( fname::String,
             trial+=1
 
             # projecting solution : met a jour sPrj, sInt, sFea dans vg --------
-            projectingSolution!(vg,k,A,c1,c2,λ1,λ2,d)
+            projectingSolution!(vg,k,A,c1,c2,λ1,λ2,d,projectionMode)
             println("   t=",trial,"  |  Tps=", round(time()- temps, digits=4))
 
             if !isFeasible(vg,k)

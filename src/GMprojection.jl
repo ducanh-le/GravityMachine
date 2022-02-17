@@ -53,10 +53,10 @@ function Δ2SPA_milieu(A::Array{Int,2}, vg::Vector{tGenerateur},
         k -= 1
     end
 
+    cλ = λ1[k].*c1 + λ2[k].*c2
     proj = Model(GLPK.Optimizer)
     @variable(proj, 0.0 <= x[1:length(xTilde)] <= 1.0)
     #@objective(proj, Min, sum(λ1[k] * x[i] for i in idxTilde0) + sum(λ2[k] * (1 - x[i]) for i in idxTilde1))
-    cλ = λ1[k]*c1 + λ2[k]*c2
     @objective(proj, Min, sum(cλ[i]*x[i] for i in idxTilde0) + sum(cλ[i]*(1-x[i]) for i in idxTilde1) )
     @constraint(proj, [i = 1:nbctr], (sum((x[j] * A[i, j]) for j in 1:nbvar)) == 1)
     optimize!(proj)
@@ -74,9 +74,9 @@ function projectingSolution!(vg::Vector{tGenerateur}, k::Int64,
     # Projete la solution entiere sur le polytope X 
     if projectionMode == 1
         fPrj, vg[k].sPrj.x = Δ2SPA(A,vg[k].sInt.x)
-    else if projectionMode == 2
+    elseif projectionMode == 2
         fPrj, vg[k].sPrj.x = Δ2SPA_milieu(A,vg,c1,c2,k,λ1,λ2)
-    else if projectionMode == 3
+    elseif projectionMode == 3
         fPrj, vg[k].sPrj.x = Δ2SPA_generateur(A,vg[k].sInt.x,c1,c2,k,λ1,λ2)
     end
 

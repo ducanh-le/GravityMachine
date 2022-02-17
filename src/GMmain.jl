@@ -5,9 +5,9 @@ println("""\nAlgorithme "Gravity machine" --------------------------------\n""")
 
 const verbose = true
 const graphic = true
-const generateurVisualise = -1
-const normalise = true
-const projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur
+generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
+normalise = false
+projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random
@@ -286,36 +286,71 @@ end
 function calculerDirections_milieu(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
     # function calculerDirections_milieu(L, vg::Vector{tGenerateur})
  
-     nbgen = size(vg,1)
-     λ1=Vector{Float64}(undef, nbgen - 1)
-     λ2=Vector{Float64}(undef, nbgen - 1)
-     for k in 2:nbgen
+    nbgen = size(vg,1)
+    λ1=Vector{Float64}(undef, nbgen - 1)
+    λ2=Vector{Float64}(undef, nbgen - 1)
+    n1 = L[end].y[1]
+    n2 = L[1].y[2]
+
+    for k in 2:nbgen
+        x1, y1 = vg[k-1].sRel.y[1], vg[k-1].sRel.y[2]
+        x2, y2 = vg[k].sRel.y[1], vg[k].sRel.y[2]
+        xm = (x1 + x2) / 2.0
+        ym = (y1 + y2) / 2.0
+        Δx = abs(n1 - xm)
+        Δy = abs(n2 - ym)
+        λ1[k-1] = 1 - Δx / (Δx + Δy)
+        λ2[k-1] = 1 - Δy / (Δx + Δy)
+        @printf("  k= %3d   \n", k)
+        @printf("  x1= %7.2f   y1= %7.2f \n", x1, y1)
+        @printf("  x2= %7.2f   y2= %7.2f \n", x2, y2)
+        @printf("  Δx= %7.2f   Δy= %7.2f \n", Δx, Δy)
+        @printf("  λ1= %6.5f   λ2= %6.5f \n", λ1[k-1], λ2[k-1])
+        plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
+        annotate("",
+            xy = [xm; ym],# Arrow tip
+            xytext = [n1; n2], # Text offset from tip
+            arrowprops = Dict("arrowstyle" => "->"))
+        println("")
+    end
+    return λ1, λ2
+end
+
+
+# ==============================================================================
+# Calcule la direction d'interet du nadir vers le milieu de segment reliant deux points generateurs
+function calculerDirections_milieu_normalise(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
+    # function calculerDirections_milieu(L, vg::Vector{tGenerateur})
  
-         n1 = L[end].y[1]
-         n2 = L[1].y[2]
- 
-         x1,y1 = vg[k-1].sRel.y[1], vg[k-1].sRel.y[2]
-         x2,y2 = vg[k].sRel.y[1], vg[k].sRel.y[2]
-         xm=(x1+x2)/2.0
-         ym=(y1+y2)/2.0
-         Δx = abs(n1-xm)
-         Δy = abs(n2-ym)
-         λ1[k-1] =  1 - Δx / (Δx+Δy)
-         λ2[k-1] =  1 - Δy / (Δx+Δy)
-         @printf("  k= %3d   \n",k)
-         @printf("  x1= %7.2f   y1= %7.2f \n",x1,y1)
-         @printf("  x2= %7.2f   y2= %7.2f \n",x2,y2)
-         @printf("  Δx= %7.2f    Δy= %7.2f \n",Δx,Δy)
-         @printf("  λ1= %6.5f    λ2= %6.5f \n",λ1[k-1],λ2[k-1])
-         plot(n1, n2, xm, ym, linestyle="-", color="blue", marker="+")
-         annotate("",
-                  xy=[xm;ym],# Arrow tip
-                  xytext=[n1;n2], # Text offset from tip
-                  arrowprops=Dict("arrowstyle"=>"->"))
-         println("")
-     end
+    nbgen = size(vg,1)
+    λ1=Vector{Float64}(undef, nbgen - 1)
+    λ2=Vector{Float64}(undef, nbgen - 1)
+    n1 = 1
+    n2 = 1
+    
+    for k in 2:nbgen
+        x1, y1 = L[end].y[1] / vg[k-1].sRel.y[1], L[1].y[2] / vg[k-1].sRel.y[2]
+        x2, y2 = L[end].y[1] / vg[k].sRel.y[1], L[1].y[2] / vg[k].sRel.y[2]
+        xm = (x1 + x2) / 2.0
+        ym = (y1 + y2) / 2.0
+        Δx = abs(n1 - xm)
+        Δy = abs(n2 - ym)
+        λ1[k-1] = 1 - Δx / (Δx + Δy)
+        λ2[k-1] = 1 - Δy / (Δx + Δy)
+        @printf("  k= %3d   \n", k)
+        @printf("  x1= %7.2f   y1= %7.2f \n", x1, y1)
+        @printf("  x2= %7.2f   y2= %7.2f \n", x2, y2)
+        @printf("  Δx= %7.2f   Δy= %7.2f \n", Δx, Δy)
+        @printf("  λ1= %6.5f   λ2= %6.5f \n", λ1[k-1], λ2[k-1])
+        plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
+        annotate("",
+            xy = [xm; ym],# Arrow tip
+            xytext = [n1; n2], # Text offset from tip
+            arrowprops = Dict("arrowstyle" => "->"))
+        println("")
+    end
      return λ1, λ2
- end
+end
 
 
 # ==============================================================================
@@ -323,39 +358,38 @@ function calculerDirections_milieu(L::Vector{tSolution{Float64}}, vg::Vector{tGe
 function calculerDirections_generateur(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
     #function calculerDirections_generateur(L, vg::Vector{tGenerateur})
 
-    nbgen = size(vg,1)
-    λ1=Vector{Float64}(undef, nbgen)
-    λ2=Vector{Float64}(undef, nbgen)
+    nbgen = size(vg, 1)
+    λ1 = Vector{Float64}(undef, nbgen)
+    λ2 = Vector{Float64}(undef, nbgen)
+    n1 = L[end].y[1]
+    n2 = L[1].y[2]
+
     for k in 1:nbgen
-
-        n1 = L[end].y[1]
-        n2 = L[1].y[2]
-
-        xm=vg[k].sRel.y[1]
-        ym=vg[k].sRel.y[2]
-        Δx = abs(n1-xm)
-        Δy = abs(n2-ym)
-        λ1[k] =  1 - Δx / (Δx+Δy)
-        λ2[k] =  1 - Δy / (Δx+Δy)
-        @printf("  k= %3d   ",k)
-        @printf("  xm= %7.2f   ym= %7.2f ",xm,ym)
-        @printf("  Δx= %8.2f    Δy= %8.2f ",Δx,Δy)
-        @printf("  λ1= %6.5f    λ2= %6.5f \n",λ1[k],λ2[k])
-        if generateurVisualise == -1 
+        xm = vg[k].sRel.y[1]
+        ym = vg[k].sRel.y[2]
+        Δx = abs(n1 - xm)
+        Δy = abs(n2 - ym)
+        λ1[k] = 1 - Δx / (Δx + Δy)
+        λ2[k] = 1 - Δy / (Δx + Δy)
+        @printf("  k= %3d   ", k)
+        @printf("  xm= %7.2f   ym= %7.2f ", xm, ym)
+        @printf("  Δx= %8.2f   Δy= %8.2f ", Δx, Δy)
+        @printf("  λ1= %6.5f   λ2= %6.5f \n", λ1[k], λ2[k])
+        if generateurVisualise == -1
             # affichage pour tous les generateurs
-            plot(n1, n2, xm, ym, linestyle="-", color="blue", marker="+")
+            plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
             annotate("",
-                     xy=[xm;ym],# Arrow tip
-                     xytext=[n1;n2], # Text offset from tip
-                     arrowprops=Dict("arrowstyle"=>"->"))        
+                xy = [xm; ym],# Arrow tip
+                xytext = [n1; n2], # Text offset from tip
+                arrowprops = Dict("arrowstyle" => "->"))
         elseif generateurVisualise == k
             # affichage seulement pour le generateur k
-            plot(n1, n2, xm, ym, linestyle="-", color="blue", marker="+")
+            plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
             annotate("",
-                     xy=[xm;ym],# Arrow tip
-                     xytext=[n1;n2], # Text offset from tip
-                     arrowprops=Dict("arrowstyle"=>"->"))        
-        end 
+                xy = [xm; ym],# Arrow tip
+                xytext = [n1; n2], # Text offset from tip
+                arrowprops = Dict("arrowstyle" => "->"))
+        end
         #println("")
     end
     return λ1, λ2
@@ -366,39 +400,38 @@ end
 # Calcule la direction d'interet du nadir vers un point generateur (version normalisée)
 function calculerDirections_generateur_normalise(L::Vector{tSolution{Float64}}, vg::Vector{tGenerateur})
 
-    nbgen = size(vg,1)
-    λ1=Vector{Float64}(undef, nbgen)
-    λ2=Vector{Float64}(undef, nbgen)
+    nbgen = size(vg, 1)
+    λ1 = Vector{Float64}(undef, nbgen)
+    λ2 = Vector{Float64}(undef, nbgen)
+    n1 = 1
+    n2 = 1
+
     for k in 1:nbgen
-
-        n1 = 1 #L[end].y[1]
-        n2 = 1 #L[1].y[2]
-
-        xm= vg[k].sRel.y[1] / L[end].y[1]
-        ym= vg[k].sRel.y[2] / L[1].y[2]
-        Δx = abs(n1-xm)
-        Δy = abs(n2-ym)
-        λ1[k] =  1 - Δx / (Δx+Δy)
-        λ2[k] =  1 - Δy / (Δx+Δy)
-        @printf("  k= %3d   ",k)
-        @printf("  xm= %7.2f   ym= %7.2f ",xm,ym)
-        @printf("  Δx= %8.2f    Δy= %8.2f ",Δx,Δy)
-        @printf("  λ1= %6.5f    λ2= %6.5f \n",λ1[k],λ2[k])
-        if generateurVisualise == -1 
+        xm = vg[k].sRel.y[1] / L[end].y[1]
+        ym = vg[k].sRel.y[2] / L[1].y[2]
+        Δx = abs(n1 - xm)
+        Δy = abs(n2 - ym)
+        λ1[k] = 1 - Δx / (Δx + Δy)
+        λ2[k] = 1 - Δy / (Δx + Δy)
+        @printf("  k= %3d   ", k)
+        @printf("  xm= %7.2f   ym= %7.2f ", xm, ym)
+        @printf("  Δx= %8.2f   Δy= %8.2f ", Δx, Δy)
+        @printf("  λ1= %6.5f   λ2= %6.5f \n", λ1[k], λ2[k])
+        if generateurVisualise == -1
             # affichage pour tous les generateurs
-            plot(n1, n2, xm, ym, linestyle="-", color="blue", marker="+")
+            plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
             annotate("",
-                     xy=[xm;ym],# Arrow tip
-                     xytext=[n1;n2], # Text offset from tip
-                     arrowprops=Dict("arrowstyle"=>"->"))        
+                xy = [xm; ym],# Arrow tip
+                xytext = [n1; n2], # Text offset from tip
+                arrowprops = Dict("arrowstyle" => "->"))
         elseif generateurVisualise == k
             # affichage seulement pour le generateur k
-            plot(n1, n2, xm, ym, linestyle="-", color="blue", marker="+")
+            plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
             annotate("",
-                     xy=[xm;ym],# Arrow tip
-                     xytext=[n1;n2], # Text offset from tip
-                     arrowprops=Dict("arrowstyle"=>"->"))        
-        end 
+                xy = [xm; ym],# Arrow tip
+                xytext = [n1; n2], # Text offset from tip
+                arrowprops = Dict("arrowstyle" => "->"))
+        end
         #println("")
     end
     return λ1, λ2
@@ -506,8 +539,12 @@ function GM( fname::String,
     # calcule les directions (λ1,λ2) pour chaque generateur a utiliser lors des projections
 
     if projectionMode == 2
-        λ1,λ2 = calculerDirections_milieu(L,vg)
-    else if projectionMode == 3
+        if normalise
+            λ1,λ2 = calculerDirections_milieu_normalise(L,vg)
+        else
+            λ1,λ2 = calculerDirections_milieu(L,vg)
+        end
+    elseif projectionMode == 3
         if normalise
             λ1,λ2 = calculerDirections_generateur_normalise(L,vg)
         else

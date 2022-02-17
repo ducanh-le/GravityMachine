@@ -3,7 +3,7 @@
 
 println("""\nAlgorithme "Gravity machine" --------------------------------\n""")
 
-const verbose = true
+const verbose = false
 const graphic = true
 
 println("-) Active les packages requis\n")
@@ -372,7 +372,7 @@ function GM( fname::String,
     @assert tailleSampling>=3 "Erreur : Au moins 3 sont requis"
 
     @printf("0) instance et parametres \n\n")
-    verbose ? println("  instance = $fname | tailleSampling = $tailleSampling | maxTrial = $maxTrial | maxTime = $maxTime\n\n") : nothing
+    println("  instance = $fname | tailleSampling = $tailleSampling | maxTrial = $maxTrial | maxTime = $maxTime\n\n")
 
     # chargement de l'instance numerique ---------------------------------------
     c1, c2, A = loadInstance2SPA(fname) # instance numerique de SPA
@@ -616,7 +616,7 @@ function GM_multi()
     end
 end
 
-#@time GM("sppaa02.txt", 6, 20, 20)
+@time GM("sppaa02.txt", 6, 20, 20)
 #@time GM("sppnw03.txt", 6, 20, 20) #pb glpk
 #@time GM("sppnw10.txt", 6, 20, 20)
 #@time GM("didactic5.txt", 5, 5, 10)

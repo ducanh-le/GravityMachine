@@ -325,16 +325,14 @@ function calculerDirections_milieu_normalise(L::Vector{tSolution{Float64}}, vg::
     nbgen = size(vg,1)
     λ1=Vector{Float64}(undef, nbgen - 1)
     λ2=Vector{Float64}(undef, nbgen - 1)
-    n1 = 1
-    n2 = 1
     
     for k in 2:nbgen
         x1, y1 = L[end].y[1] / vg[k-1].sRel.y[1], L[1].y[2] / vg[k-1].sRel.y[2]
         x2, y2 = L[end].y[1] / vg[k].sRel.y[1], L[1].y[2] / vg[k].sRel.y[2]
         xm = (x1 + x2) / 2.0
         ym = (y1 + y2) / 2.0
-        Δx = abs(n1 - xm)
-        Δy = abs(n2 - ym)
+        Δx = 1 - xm
+        Δy = 1 - ym
         λ1[k-1] = 1 - Δx / (Δx + Δy)
         λ2[k-1] = 1 - Δy / (Δx + Δy)
         @printf("  k= %3d   \n", k)
@@ -342,10 +340,10 @@ function calculerDirections_milieu_normalise(L::Vector{tSolution{Float64}}, vg::
         @printf("  x2= %7.2f   y2= %7.2f \n", x2, y2)
         @printf("  Δx= %7.2f   Δy= %7.2f \n", Δx, Δy)
         @printf("  λ1= %6.5f   λ2= %6.5f \n", λ1[k-1], λ2[k-1])
-        plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
+        plot(1, 1, xm, ym, linestyle = "-", color = "blue", marker = "+")
         annotate("",
             xy = [xm; ym],# Arrow tip
-            xytext = [n1; n2], # Text offset from tip
+            xytext = [1; 1], # Text offset from tip
             arrowprops = Dict("arrowstyle" => "->"))
         println("")
     end
@@ -403,14 +401,12 @@ function calculerDirections_generateur_normalise(L::Vector{tSolution{Float64}}, 
     nbgen = size(vg, 1)
     λ1 = Vector{Float64}(undef, nbgen)
     λ2 = Vector{Float64}(undef, nbgen)
-    n1 = 1
-    n2 = 1
 
     for k in 1:nbgen
         xm = vg[k].sRel.y[1] / L[end].y[1]
         ym = vg[k].sRel.y[2] / L[1].y[2]
-        Δx = abs(n1 - xm)
-        Δy = abs(n2 - ym)
+        Δx = 1 - xm
+        Δy = 1 - ym
         λ1[k] = 1 - Δx / (Δx + Δy)
         λ2[k] = 1 - Δy / (Δx + Δy)
         @printf("  k= %3d   ", k)
@@ -419,17 +415,17 @@ function calculerDirections_generateur_normalise(L::Vector{tSolution{Float64}}, 
         @printf("  λ1= %6.5f   λ2= %6.5f \n", λ1[k], λ2[k])
         if generateurVisualise == -1
             # affichage pour tous les generateurs
-            plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
+            plot(1, 1, xm, ym, linestyle = "-", color = "blue", marker = "+")
             annotate("",
                 xy = [xm; ym],# Arrow tip
-                xytext = [n1; n2], # Text offset from tip
+                xytext = [1; 1], # Text offset from tip
                 arrowprops = Dict("arrowstyle" => "->"))
         elseif generateurVisualise == k
             # affichage seulement pour le generateur k
-            plot(n1, n2, xm, ym, linestyle = "-", color = "blue", marker = "+")
+            plot(1, 1, xm, ym, linestyle = "-", color = "blue", marker = "+")
             annotate("",
                 xy = [xm; ym],# Arrow tip
-                xytext = [n1; n2], # Text offset from tip
+                xytext = [1; 1], # Text offset from tip
                 arrowprops = Dict("arrowstyle" => "->"))
         end
         #println("")

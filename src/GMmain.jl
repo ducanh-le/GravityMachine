@@ -6,7 +6,7 @@ println("""\nAlgorithme "Gravity machine" --------------------------------\n""")
 const verbose = true
 const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
-normalise = false
+normalise = true
 projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur
 
 println("-) Active les packages requis\n")
@@ -439,6 +439,44 @@ end
  
 
 # ==============================================================================
+# re-calculer le structure pour les points qui apparaitront dans l'affichage graphique normalisé
+
+function normaliserDisplay(L::Vector{tSolution{Float64}},d::tListDisplay)
+    xmax = L[end].y[1]
+    ymax = L[1].y[2]
+    dNormalise = tListDisplayNormalise([],[], [],[], [],[], [],[], [],[], [],[], [],[])
+    impair = true
+    for n in fieldnames(tListDisplay)
+        impair ? divident = xmax : divident = ymax
+        current = getfield(d,n)
+        for i in 1:length(current)
+            push!(getfield(dNormalise,n),current[i]/divident)
+        end
+        impair = !impair
+    end
+    return dNormalise
+end
+
+
+# ==============================================================================
+# re-calculer les coordonnees pour les points dans l'affichage graphique normalisé
+
+function normaliserVectorPoint(L::Vector{tSolution{Float64}},x::Vector{Int64},y::Vector{Int64})
+    xmax = L[end].y[1]
+    ymax = L[1].y[2]
+    x_normalise = Vector{Float64}(undef, length(x))
+    y_normalise = Vector{Float64}(undef, length(y))
+    
+    for i in 1:length(x)
+        x_normalise[i] = x[i] / xmax
+        y_normalise[i] = y[i] / ymax
+    end
+    
+    return x_normalise, y_normalise
+end
+
+
+# ==============================================================================
 # point d'entree principal
 
 function GM( fname::String,
@@ -639,6 +677,8 @@ function GM( fname::String,
     # ==========================================================================
     @printf("6) Edition des resultats \n\n")
 
+    normalise ? displayPoint = normaliserDisplay(L,d) : displayPoint = d
+
 #    figure("Gravity Machine",figsize=(6.5,5))
     #xlim(25000,45000)
     #ylim(20000,40000)
@@ -647,38 +687,46 @@ function GM( fname::String,
     # Donne les points relaches initiaux ---------------------------------------
 #    scatter(d.xLf1,d.yLf1,color="blue", marker="x")
 #    scatter(d.xLf2,d.yLf2,color="red", marker="+")
-    graphic ? scatter(d.xL,d.yL,color="blue", marker="x", label = L"y \in L") : nothing
+    graphic ? scatter(displayPoint.xL,displayPoint.yL,color="blue", marker="x", label = L"y \in L") : nothing
 
     # Donne les points entiers -------------------------------------------------
-    graphic ? scatter(d.XInt,d.YInt,color="orange", marker="s", label = L"y"*" rounded") : nothing
+    graphic ? scatter(displayPoint.XInt,displayPoint.YInt,color="orange", marker="s", label = L"y"*" rounded") : nothing
 #    @show d.XInt
 #    @show d.YInt
 
     # Donne les points apres projection Δ(x,x̃) ---------------------------------
-    graphic ? scatter(d.XProj,d.YProj, color="red", marker="x", label = L"y"*" projected") : nothing
+    graphic ? scatter(displayPoint.XProj,displayPoint.YProj, color="red", marker="x", label = L"y"*" projected") : nothing
 #    @show d.XProj
 #    @show d.YProj
 
     # Donne les points admissibles ---------------------------------------------
-    graphic ? scatter(d.XFeas,d.YFeas, color="green", marker="o", label = L"y \in F") : nothing
+    graphic ? scatter(displayPoint.XFeas,displayPoint.YFeas, color="green", marker="o", label = L"y \in F") : nothing
 #    @show d.XFeas
 #    @show d.YFeas
 
     # Donne l'ensemble bornant primal obtenu + la frontiere correspondante -----
     #--> TODO : stocker l'EBP dans U proprement
     X_EBP_frontiere, Y_EBP_frontiere, X_EBP, Y_EBP = ExtractEBP(d.XFeas, d.YFeas)
-    plot(X_EBP_frontiere, Y_EBP_frontiere, color="green", markersize=3.0, marker="x")
-    scatter(X_EBP, Y_EBP, color="green", s = 150, alpha = 0.3, label = L"y \in U")
+    if normalise
+        X_EBP_frontiere_display, Y_EBP_frontiere_display = normaliserVectorPoint(L,X_EBP_frontiere,Y_EBP_frontiere)
+        X_EBP_display, Y_EBP_display = normaliserVectorPoint(L,X_EBP, Y_EBP)
+    else
+        X_EBP_frontiere_display, Y_EBP_frontiere_display, X_EBP_display, Y_EBP_display = X_EBP_frontiere, Y_EBP_frontiere, X_EBP, Y_EBP
+    end
+    plot(X_EBP_frontiere_display, Y_EBP_frontiere_display, color="green", markersize=3.0, marker="x")
+    scatter(X_EBP_display, Y_EBP_display, color="green", s = 150, alpha = 0.3, label = L"y \in U")
     @show X_EBP
     @show Y_EBP
 
     # Donne les points qui ont fait l'objet d'une perturbation -----------------
-     scatter(d.XPert,d.YPert, color="magenta", marker="s", label ="pertub")
+     scatter(displayPoint.XPert,displayPoint.YPert, color="magenta", marker="s", label ="pertub")
 
     # Donne les points non-domines exacts de cette instance --------------------
      XN,YN = loadNDPoints2SPA(fname)
-     plot(XN, YN, color="black", linewidth=0.75, marker="+", markersize=1.0, linestyle=":", label = L"y \in Y_N")
-     scatter(XN, YN, color="black", marker="+")
+     normalise ? (XNdisplay, YNdisplay) = normaliserVectorPoint(L,XN,YN) : (XNdisplay, YNdisplay) = (XN,YN)
+
+     plot(XNdisplay, YNdisplay, color="black", linewidth=0.75, marker="+", markersize=1.0, linestyle=":", label = L"y \in Y_N")
+     scatter(XNdisplay, YNdisplay, color="black", marker="+")
     @show XN
     @show YN
 
@@ -707,8 +755,9 @@ function GM_multi()
     end
 end
 
-@time GM("sppaa02.txt", 6, 20, 20)
-#@time GM("sppnw03.txt", 6, 20, 20) #pb glpk
+
+#@time GM("sppaa02.txt", 6, 20, 20)
+#@time GM("sppnw03.txt", 6, 20, 20)
 #@time GM("sppnw10.txt", 6, 20, 20)
 #@time GM("didactic5.txt", 5, 5, 10)
 #@time GM("sppnw29.txt", 6, 30, 20)

@@ -20,7 +20,6 @@ mutable struct tPoint
     y :: Float64
 end
 
-
 # type grouping the lists of points for dysplaying purposes
 mutable struct tListDisplay
     xLf1  :: Vector{Float64};  yLf1  :: Vector{Float64} # liste des points (x,y) relaches
@@ -32,6 +31,16 @@ mutable struct tListDisplay
     XPert :: Vector{Int64};    YPert :: Vector{Int64}   # liste des points (x,y) perturbes
 end
 
+# type grouping the lists of points for dysplaying purposes
+mutable struct tListDisplayNormalise
+    xLf1  :: Vector{Float64};  yLf1  :: Vector{Float64} # liste des points (x,y) relaches
+    xLf2  :: Vector{Float64};  yLf2  :: Vector{Float64} # liste des points (x,y) relaches
+    xL    :: Vector{Float64};  yL    :: Vector{Float64} # liste des points (x,y) relaches
+    XInt  :: Vector{Float64};  YInt  :: Vector{Float64} # liste des points (x,y) entiers
+    XProj :: Vector{Float64};  YProj :: Vector{Float64} # liste des points (x,y) projetes
+    XFeas :: Vector{Float64};  YFeas :: Vector{Float64} # liste des points (x,y) admissibles
+    XPert :: Vector{Float64};  YPert :: Vector{Float64} # liste des points (x,y) perturbes
+end
 
 # ==============================================================================
 # Initialisation structure donnees contenant tous les generateurs

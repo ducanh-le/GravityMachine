@@ -7,7 +7,7 @@ const verbose = true
 const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
 normalise = true
-projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur
+projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur     4: avec norme-L1
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random

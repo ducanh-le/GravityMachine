@@ -68,12 +68,11 @@ end
 # version avec somme ponderee donnant la direction vers le generateur k
 
 function Δ2SPAbis17Fev(A::Array{Int,2}, xTilde::Array{Int,1},
-    c1::Array{Int,1}, c2::Array{Int,1}, k::Int64, λ1::Vector{Float64}, λ2::Vector{Float64})
+    c1::Array{Int,1}, c2::Array{Int,1}, k::Int64, λ1::Vector{Float64}, λ2::Vector{Float64}, r::Float64)
 
     nbctr = size(A, 1)
     nbvar = size(A, 2)
     idxTilde0, idxTilde1 = split01(xTilde)
-    @show length(idxTilde1)
 
     cλ = λ1[k] .* c1 + λ2[k] .* c2
     proj = Model(GLPK.Optimizer)
@@ -82,10 +81,9 @@ function Δ2SPAbis17Fev(A::Array{Int,2}, xTilde::Array{Int,1},
     @objective(proj, Min, sum(cλ[i] * x[i] for i in idxTilde0) + sum(cλ[i] * (1 - x[i]) for i in idxTilde1))
     @constraint(proj, [i = 1:nbctr], (sum((x[j] * A[i, j]) for j in 1:nbvar)) == 1)
 
-    c1limit = sum(c1 .* xTilde) * 1.03
-    c2limit = sum(c2 .* xTilde) * 1.03
-    @show c1limit #, c1, xTilde
-    @show c2limit #, c2, xTilde
+    c1limit = sum(c1 .* xTilde) * r
+    c2limit = sum(c2 .* xTilde) * r
+
     @constraint(proj, sum(c1[i] * x[i] for i in 1:nbvar) <= c1limit)
     @constraint(proj, sum(c2[i] * x[i] for i in 1:nbvar) <= c2limit)
 
@@ -98,7 +96,7 @@ end
 function projectingSolution!(vg::Vector{tGenerateur}, k::Int64, 
                              A::Array{Int,2}, c1::Array{Int,1}, c2::Array{Int,1}, 
                              λ1::Vector{Float64}, λ2::Vector{Float64},
-                             d::tListDisplay,projectionMode::Int64)
+                             d::tListDisplay, projectionMode::Int64, r::Float64)
 
     # --------------------------------------------------------------------------
     # Projete la solution entiere sur le polytope X 
@@ -110,7 +108,7 @@ function projectingSolution!(vg::Vector{tGenerateur}, k::Int64,
     elseif projectionMode == 3
         fPrj, vg[k].sPrj.x = Δ2SPA_generateur(A,vg[k].sInt.x,c1,c2,k,λ1,λ2)
     elseif projectionMode == 4
-        fPrj, vg[k].sPrj.x = Δ2SPAbis17Fev(A,vg[k].sInt.x,c1,c2,k,λ1,λ2)
+        fPrj, vg[k].sPrj.x = Δ2SPAbis17Fev(A,vg[k].sInt.x,c1,c2,k,λ1,λ2,r)
     end
 
     # Nettoyage de la valeur de vg[k].sPrj.x et calcul du point bi-objectif

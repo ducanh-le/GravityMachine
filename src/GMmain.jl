@@ -6,8 +6,8 @@ println("""\nAlgorithme "Gravity machine" --------------------------------\n""")
 const verbose = true
 const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
-normalise = true
-projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur     4: avec norme-L1
+normalise = false
+projectionMode = 4    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random
@@ -475,25 +475,25 @@ end
 # ==============================================================================
 # point d'entree principal
 
-function GM( fname::String,
-             tailleSampling::Int64,
-             maxTrial::Int64,
-             maxTime::Int64
-           )
+function GM(fname::String,
+    tailleSampling::Int64,
+    maxTrial::Int64,
+    maxTime::Int64
+)
 
-    @assert tailleSampling>=3 "Erreur : Au moins 3 sont requis"
+    @assert tailleSampling >= 3 "Erreur : Au moins 3 sont requis"
 
     @printf("0) instance et parametres \n\n")
     println("  instance = $fname | tailleSampling = $tailleSampling | maxTrial = $maxTrial | maxTime = $maxTime\n\n")
 
     # chargement de l'instance numerique ---------------------------------------
     c1, c2, A = loadInstance2SPA(fname) # instance numerique de SPA
-    nbctr = size(A,1)
-    nbvar = size(A,2)
+    nbctr = size(A, 1)
+    nbvar = size(A, 2)
     nbobj = 2
 
     # structure pour les points qui apparaitront dans l'affichage graphique
-    d = tListDisplay([],[], [],[], [],[], [],[], [],[], [],[], [],[])
+    d = tListDisplay([], [], [], [], [], [], [], [], [], [], [], [], [], [])
 
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
@@ -507,8 +507,8 @@ function GM( fname::String,
     f2RL, xf2RL = computeLinearRelax2SPA(nbvar, nbctr, A, c1, c2, typemax(Int), 2) # opt fct 2
     maxf1RL, minf2RL = evaluerSolution(xf2RL, c1, c2)
 
-    verbose ? @printf("  f1_min=%8.2f ↔ f1_max=%8.2f (Δ=%.2f) \n",minf1RL, maxf1RL, maxf1RL-minf1RL) : nothing
-    verbose ? @printf("  f2_min=%8.2f ↔ f2_max=%8.2f (Δ=%.2f) \n\n",minf2RL, maxf2RL, maxf2RL-minf2RL) : nothing
+    verbose ? @printf("  f1_min=%8.2f ↔ f1_max=%8.2f (Δ=%.2f) \n", minf1RL, maxf1RL, maxf1RL - minf1RL) : nothing
+    verbose ? @printf("  f2_min=%8.2f ↔ f2_max=%8.2f (Δ=%.2f) \n\n", minf2RL, maxf2RL, maxf2RL - minf2RL) : nothing
 
 
     # --------------------------------------------------------------------------
@@ -527,7 +527,7 @@ function GM( fname::String,
     # --------------------------------------------------------------------------
     @printf("3) place L dans structure et verifie l'admissibilite de chaque generateur\n\n")
 
-    for k=1:nbgen
+    for k = 1:nbgen
 
         verbose ? @printf("  %2d  : [ %8.2f , %8.2f ] ", k, L[k].y[1], L[k].y[2]) : nothing
 
@@ -537,20 +537,20 @@ function GM( fname::String,
         # test d'admissibilite et marquage de la solution le cas echeant -------
         if estAdmissible(vg[k].sRel.x)
             ajouterXtilde!(vg, k, convert.(Int, vg[k].sRel.x), convert.(Int, L[k].y))
-            vg[k].sFea   = true
+            vg[k].sFea = true
             verbose ? @printf("→ Admissible \n") : nothing
             # archive le point obtenu pour les besoins d'affichage    
-            if generateurVisualise == -1 
+            if generateurVisualise == -1
                 # archivage pour tous les generateurs
-                push!(d.XFeas,vg[k].sInt.y[1])
-                push!(d.YFeas,vg[k].sInt.y[2])
+                push!(d.XFeas, vg[k].sInt.y[1])
+                push!(d.YFeas, vg[k].sInt.y[2])
             elseif generateurVisualise == k
                 # archivage seulement pour le generateur k
-                push!(d.XFeas,vg[k].sInt.y[1])
-                push!(d.YFeas,vg[k].sInt.y[2])
-            end 
+                push!(d.XFeas, vg[k].sInt.y[1])
+                push!(d.YFeas, vg[k].sInt.y[2])
+            end
         else
-            vg[k].sFea   = false
+            vg[k].sFea = false
             verbose ? @printf("→ x          \n") : nothing
         end
 
@@ -561,7 +561,7 @@ function GM( fname::String,
     # --------------------------------------------------------------------------
     # Sortie graphique
 
-    figure("$fname by Gravity Machine",figsize=(6.5,5))
+    figure("$fname by Gravity Machine", figsize = (6.5, 5))
     #xlim(25000,45000)
     #ylim(20000,40000)
     xlabel(L"z^1(x)")
@@ -574,86 +574,157 @@ function GM( fname::String,
 
     if projectionMode == 2
         if normalise
-            λ1,λ2 = calculerDirections_milieu_normalise(L,vg)
+            λ1, λ2 = calculerDirections_milieu_normalise(L, vg)
         else
-            λ1,λ2 = calculerDirections_milieu(L,vg)
+            λ1, λ2 = calculerDirections_milieu(L, vg)
         end
-    elseif projectionMode == 3
+    elseif projectionMode == 3 || projectionMode == 4
         if normalise
-            λ1,λ2 = calculerDirections_generateur_normalise(L,vg)
+            λ1, λ2 = calculerDirections_generateur_normalise(L, vg)
         else
-            λ1,λ2 = calculerDirections_generateur(L,vg)
+            λ1, λ2 = calculerDirections_generateur(L, vg)
         end
     end
 
     # ==========================================================================
 
     @printf("4) terraformation generateur par generateur \n\n")
+    #=                                                  VERSION INITIALE
+        nbIterTotal = 0
+        nbgenNotFeasible = 0
+        for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
+            temps = time()
+            trial = 0
+            H = (Vector{Int64})[]
 
-    nbIterTotal = 0
-    nbgenNotFeasible = 0
-    for k in [i for i in 1:nbgen if !isFeasible(vg,i)]
-        temps = time()
-        trial = 0
-        H =(Vector{Int64})[]
+            #perturbSolution30!(vg,k,c1,c2,d)
 
-#perturbSolution30!(vg,k,c1,c2,d)
+            # rounding solution : met a jour sInt dans vg --------------------------
+            #roundingSolution!(vg,k,c1,c2,d)  # un cone
+            #roundingSolutionnew24!(vg,k,c1,c2,d) # deux cones
+            roundingSolutionNew23!(vg, k, c1, c2, d) # un cone et LS sur generateur
 
-        # rounding solution : met a jour sInt dans vg --------------------------
-        #roundingSolution!(vg,k,c1,c2,d)  # un cone
-        #roundingSolutionnew24!(vg,k,c1,c2,d) # deux cones
-        roundingSolutionNew23!(vg,k,c1,c2,d) # un cone et LS sur generateur
+            push!(H, [vg[k].sInt.y[1], vg[k].sInt.y[2]])
+            println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
 
-        push!(H,[vg[k].sInt.y[1],vg[k].sInt.y[2]])
-        println("   t=",trial,"  |  Tps=", round(time()- temps, digits=4))
+            while !(t1 = isFeasible(vg, k)) && !(t2 = isFinished(trial, maxTrial)) && !(t3 = isTimeout(temps, maxTime))
 
-        while !(t1=isFeasible(vg,k)) && !(t2=isFinished(trial, maxTrial)) && !(t3=isTimeout(temps, maxTime))
+                trial += 1
 
-            trial+=1
+                # projecting solution : met a jour sPrj, sInt, sFea dans vg --------
+                projectingSolution!(vg, k, A, c1, c2, λ1, λ2, d, projectionMode)
+                println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
 
-            # projecting solution : met a jour sPrj, sInt, sFea dans vg --------
-            projectingSolution!(vg,k,A,c1,c2,λ1,λ2,d,projectionMode)
-            println("   t=",trial,"  |  Tps=", round(time()- temps, digits=4))
+                if !isFeasible(vg, k)
 
-            if !isFeasible(vg,k)
+                    # rounding solution : met a jour sInt dans vg --------------------------
+                    #roundingSolution!(vg,k,c1,c2,d)
+                    #roundingSolutionnew24!(vg,k,c1,c2,d)
+                    roundingSolutionNew23!(vg, k, c1, c2, d)
+                    println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
 
-                # rounding solution : met a jour sInt dans vg --------------------------
-                #roundingSolution!(vg,k,c1,c2,d)
-                #roundingSolutionnew24!(vg,k,c1,c2,d)
-                roundingSolutionNew23!(vg,k,c1,c2,d)
-                println("   t=",trial,"  |  Tps=", round(time()- temps, digits=4))
+                    # test detection cycle sur solutions entieres ------------------
+                    cycle = [vg[k].sInt.y[1], vg[k].sInt.y[2]] in H
+                    if (cycle == true)
+                        println("CYCLE!!!!!!!!!!!!!!!")
+                        # perturb solution
+                        perturbSolution30!(vg, k, c1, c2, d)
+                    end
+                    push!(H, [vg[k].sInt.y[1], vg[k].sInt.y[2]])
 
-                # test detection cycle sur solutions entieres ------------------
-                cycle = [vg[k].sInt.y[1],vg[k].sInt.y[2]] in H
-                if (cycle == true)
-                    println("CYCLE!!!!!!!!!!!!!!!")
-                    # perturb solution
-                    perturbSolution30!(vg,k,c1,c2,d)
                 end
-                push!(H,[vg[k].sInt.y[1],vg[k].sInt.y[2]])
-
             end
+
+            if t1
+                println("   feasible \n")
+            elseif t2
+                println("   maxTrial \n")
+            elseif t3
+                println("   maxTime \n")
+            end
+            nbIterTotal += trial
+            nbgenNotFeasible += 1
         end
-        if t1
-            println("   feasible \n")
-        elseif t2
-            println("   maxTrial \n")
-        elseif t3
-            println("   maxTime \n")
+        #verbose ? @printf("   Nombre d'itération moyenne afin de trouver une solution admissible : %5.3f", nbIterTotal/nbgenNotFeasible) : nothing
+        println("")
+    =#
+
+    #----------------------------------VERSION VND---------------------------------
+    for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
+        println("----------------------------------------------------------")
+        iter = 1; iterMax = 5; r = 1.00; best_distance = Inf; best_solution = (vg,d)
+        println("   First Rounding : ")
+        roundingSolutionNew23!(vg, k, c1, c2, d) # un cone et LS sur generateur
+        println("")
+        println("   Starting VND :")
+
+        while (iter <= iterMax)
+            println("       iter = ", iter, " | iterMax = ", iterMax, " | r = ", r)
+            vgPrime = deepcopy(vg); dPrime = deepcopy(d)
+            temps = time()
+            trial = 0
+            H = (Vector{Int64})[]
+
+            push!(H, [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]])
+
+            while !(t1 = isFeasible(vgPrime, k)) && !(t2 = isFinished(trial, maxTrial)) && !(t3 = isTimeout(temps, maxTime))
+
+                trial += 1
+
+                # projecting solution : met a jour sPrj, sInt, sFea dans vgPrime --------
+                projectingSolution!(vgPrime, k, A, c1, c2, λ1, λ2, dPrime, projectionMode, r)
+                println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
+
+                if !isFeasible(vgPrime, k)
+
+                    # rounding solution : met a jour sInt dans vgPrime --------------------------
+                    roundingSolutionNew23!(vgPrime, k, c1, c2, dPrime)
+                    println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
+
+                    # test detection cycle sur solutions entieres ------------------
+                    cycle = [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]] in H
+                    if (cycle == true)
+                        println("CYCLE!!!!!!!!!!!!!!!")
+                        # perturb solution
+                        perturbSolution30!(vgPrime, k, c1, c2, dPrime)
+                    end
+                    push!(H, [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]])
+
+                end
+            end
+
+            if t1
+                println("   feasible \n")
+                distance = calcul_distance_2_points(L[k].y[1], L[k].y[2], vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2])
+                if (distance < best_distance)
+                    println("   A better projected solution found by VND!!!")
+                    best_distance = distance
+                    best_solution = deepcopy((vgPrime,dPrime))
+                    iter = 1
+                else
+                    iter += 1
+                end
+            elseif t2
+                println("   maxTrial \n")
+                iter += 1
+            elseif t3
+                println("   maxTime \n")
+                iter += 1
+            end
+            r += 0.01
         end
-        nbIterTotal += trial
-        nbgenNotFeasible += 1
+        vg = best_solution[1]
+        d = best_solution[2]
     end
-    verbose ? @printf("   Nombre d'itération moyenne afin de trouver une solution admissible : %5.3f", nbIterTotal/nbgenNotFeasible) : nothing
-    println("");
+    println("")
 
     # ==========================================================================
 
     @printf("5) Extraction des resultats\n\n")
 
 
-    for k=1:nbgen
-        verbose ? @printf("  %2d  : [ %8.2f , %8.2f ] ", k, vg[k].sInt.y[1],vg[k].sInt.y[2]) : nothing
+    for k = 1:nbgen
+        verbose ? @printf("  %2d  : [ %8.2f , %8.2f ] ", k, vg[k].sInt.y[1], vg[k].sInt.y[2]) : nothing
         # test d'admissibilite et marquage de la solution le cas echeant -------
         if vg[k].sFea
             verbose ? @printf("→ Admissible \n") : nothing
@@ -663,9 +734,9 @@ function GM( fname::String,
     end
 
     # allocation de memoire pour les ensembles bornants ------------------------
-    U = Vector{tSolution{Int64}}(undef,nbgen)
+    U = Vector{tSolution{Int64}}(undef, nbgen)
     for j = 1:nbgen
-        U[j] = tSolution{Int64}(zeros(Int64,nbvar),zeros(Int64,nbobj))
+        U[j] = tSolution{Int64}(zeros(Int64, nbvar), zeros(Int64, nbobj))
     end
     #--> TODO : stocker l'EBP dans U proprement
 
@@ -673,68 +744,68 @@ function GM( fname::String,
     # ==========================================================================
     @printf("6) Edition des resultats \n\n")
 
-    normalise ? displayPoint = normaliserDisplay(L,d) : displayPoint = d
+    normalise ? displayPoint = normaliserDisplay(L, d) : displayPoint = d
 
-#    figure("Gravity Machine",figsize=(6.5,5))
+    #    figure("Gravity Machine",figsize=(6.5,5))
     #xlim(25000,45000)
     #ylim(20000,40000)
-#    xlabel(L"z^1(x)")
-#    ylabel(L"z^2(x)")
+    #    xlabel(L"z^1(x)")
+    #    ylabel(L"z^2(x)")
     # Donne les points relaches initiaux ---------------------------------------
-#    scatter(d.xLf1,d.yLf1,color="blue", marker="x")
-#    scatter(d.xLf2,d.yLf2,color="red", marker="+")
-    graphic ? scatter(displayPoint.xL,displayPoint.yL,color="blue", marker="x", label = L"y \in L") : nothing
+    #    scatter(d.xLf1,d.yLf1,color="blue", marker="x")
+    #    scatter(d.xLf2,d.yLf2,color="red", marker="+")
+    graphic ? scatter(displayPoint.xL, displayPoint.yL, color = "blue", marker = "x", label = L"y \in L") : nothing
 
     # Donne les points entiers -------------------------------------------------
-    graphic ? scatter(displayPoint.XInt,displayPoint.YInt,color="orange", marker="s", label = L"y"*" rounded") : nothing
-#    @show d.XInt
-#    @show d.YInt
+    graphic ? scatter(displayPoint.XInt, displayPoint.YInt, color = "orange", marker = "s", label = L"y" * " rounded") : nothing
+    #    @show d.XInt
+    #    @show d.YInt
 
     # Donne les points apres projection Δ(x,x̃) ---------------------------------
-    graphic ? scatter(displayPoint.XProj,displayPoint.YProj, color="red", marker="x", label = L"y"*" projected") : nothing
-#    @show d.XProj
-#    @show d.YProj
+    graphic ? scatter(displayPoint.XProj, displayPoint.YProj, color = "red", marker = "x", label = L"y" * " projected") : nothing
+    #    @show d.XProj
+    #    @show d.YProj
 
     # Donne les points admissibles ---------------------------------------------
-    graphic ? scatter(displayPoint.XFeas,displayPoint.YFeas, color="green", marker="o", label = L"y \in F") : nothing
-#    @show d.XFeas
-#    @show d.YFeas
+    graphic ? scatter(displayPoint.XFeas, displayPoint.YFeas, color = "green", marker = "o", label = L"y \in F") : nothing
+    #    @show d.XFeas
+    #    @show d.YFeas
 
     # Donne l'ensemble bornant primal obtenu + la frontiere correspondante -----
     #--> TODO : stocker l'EBP dans U proprement
     X_EBP_frontiere, Y_EBP_frontiere, X_EBP, Y_EBP = ExtractEBP(d.XFeas, d.YFeas)
     if normalise
-        X_EBP_frontiere_display, Y_EBP_frontiere_display = normaliserVectorPoint(L,X_EBP_frontiere,Y_EBP_frontiere)
-        X_EBP_display, Y_EBP_display = normaliserVectorPoint(L,X_EBP, Y_EBP)
+        X_EBP_frontiere_display, Y_EBP_frontiere_display = normaliserVectorPoint(L, X_EBP_frontiere, Y_EBP_frontiere)
+        X_EBP_display, Y_EBP_display = normaliserVectorPoint(L, X_EBP, Y_EBP)
     else
         X_EBP_frontiere_display, Y_EBP_frontiere_display, X_EBP_display, Y_EBP_display = X_EBP_frontiere, Y_EBP_frontiere, X_EBP, Y_EBP
     end
-    plot(X_EBP_frontiere_display, Y_EBP_frontiere_display, color="green", markersize=3.0, marker="x")
-    scatter(X_EBP_display, Y_EBP_display, color="green", s = 150, alpha = 0.3, label = L"y \in U")
+    plot(X_EBP_frontiere_display, Y_EBP_frontiere_display, color = "green", markersize = 3.0, marker = "x")
+    scatter(X_EBP_display, Y_EBP_display, color = "green", s = 150, alpha = 0.3, label = L"y \in U")
     @show X_EBP
     @show Y_EBP
 
     # Donne les points qui ont fait l'objet d'une perturbation -----------------
-     scatter(displayPoint.XPert,displayPoint.YPert, color="magenta", marker="s", label ="pertub")
+    scatter(displayPoint.XPert, displayPoint.YPert, color = "magenta", marker = "s", label = "pertub")
 
     # Donne les points non-domines exacts de cette instance --------------------
-     XN,YN = loadNDPoints2SPA(fname)
-     normalise ? (XNdisplay, YNdisplay) = normaliserVectorPoint(L,XN,YN) : (XNdisplay, YNdisplay) = (XN,YN)
+    XN, YN = loadNDPoints2SPA(fname)
+    normalise ? (XNdisplay, YNdisplay) = normaliserVectorPoint(L, XN, YN) : (XNdisplay, YNdisplay) = (XN, YN)
 
-     plot(XNdisplay, YNdisplay, color="black", linewidth=0.75, marker="+", markersize=1.0, linestyle=":", label = L"y \in Y_N")
-     scatter(XNdisplay, YNdisplay, color="black", marker="+")
+    plot(XNdisplay, YNdisplay, color = "black", linewidth = 0.75, marker = "+", markersize = 1.0, linestyle = ":", label = L"y \in Y_N")
+    scatter(XNdisplay, YNdisplay, color = "black", marker = "+")
     @show XN
     @show YN
 
     # Affiche le cadre avec les legendes des differents traces -----------------
-    legend(bbox_to_anchor=[1,1], loc=0, borderaxespad=0, fontsize = "x-small")
+    legend(bbox_to_anchor = [1, 1], loc = 0, borderaxespad = 0, fontsize = "x-small")
     #PyPlot.title("Cone | 1 rounding | 2-$fname")
 
     # Compute the quality indicator of the bound set U generated ---------------
     # Need at least 2 points in EBP to compute the quality indicator
     if length(X_EBP) > 1
-        quality = qualityMeasure(XN,YN, X_EBP,Y_EBP)
-        @printf("Quality measure: %5.2f %%\n", quality*100)
+        quality = qualityMeasure(XN, YN, X_EBP, Y_EBP)
+        @printf("Quality measure: %5.2f %%\n", quality * 100)
     end
 
 end
@@ -751,6 +822,12 @@ function GM_multi()
     end
 end
 
+# ==============================================================================
+# calculer la distance entre 2 points
+
+function calcul_distance_2_points(x1,y1,x2,y2)
+    return sqrt((x1-x2)^2 + (y1-y2)^2)
+end
 
 #@time GM("sppaa02.txt", 6, 20, 20)
 #@time GM("sppnw03.txt", 6, 20, 20)

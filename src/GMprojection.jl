@@ -96,7 +96,7 @@ end
 function projectingSolution!(vg::Vector{tGenerateur}, k::Int64, 
                              A::Array{Int,2}, c1::Array{Int,1}, c2::Array{Int,1}, 
                              λ1::Vector{Float64}, λ2::Vector{Float64},
-                             d::tListDisplay, projectionMode::Int64, r::Float64)
+                             d::tListDisplay, projectionMode::Int64; r::Float64 = 1.0)
 
     # --------------------------------------------------------------------------
     # Projete la solution entiere sur le polytope X 

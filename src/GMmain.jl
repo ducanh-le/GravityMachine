@@ -7,7 +7,7 @@ const verbose = true
 const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
 normalise = false
-projectionMode = 4    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
+projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random
@@ -479,6 +479,8 @@ function GM(fname::String,
     tailleSampling::Int64,
     maxTrial::Int64,
     maxTime::Int64
+    ;
+    figpath::String = ""
 )
 
     @assert tailleSampling >= 3 "Erreur : Au moins 3 sont requis"
@@ -589,7 +591,7 @@ function GM(fname::String,
     # ==========================================================================
 
     @printf("4) terraformation generateur par generateur \n\n")
-    #=                                                  VERSION INITIALE
+    #                                                  VERSION INITIALE
         nbIterTotal = 0
         nbgenNotFeasible = 0
         for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
@@ -647,20 +649,27 @@ function GM(fname::String,
         end
         #verbose ? @printf("   Nombre d'itération moyenne afin de trouver une solution admissible : %5.3f", nbIterTotal/nbgenNotFeasible) : nothing
         println("")
-    =#
+    
 
+    #=
     #----------------------------------VERSION VND---------------------------------
     for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
         println("----------------------------------------------------------")
-        iter = 1; iterMax = 5; r = 1.00; best_distance = Inf; best_solution = (vg,d)
+        iter = 1
+        iterMax = 5
+        r = 1.00
+        best_distance = Inf
+        best_solution = (vg, d)
+        solutionNotFound = true
         println("   First Rounding : ")
         roundingSolutionNew23!(vg, k, c1, c2, d) # un cone et LS sur generateur
         println("")
         println("   Starting VND :")
 
-        while (iter <= iterMax)
+        while (iter <= iterMax && solutionNotFound)
             println("       iter = ", iter, " | iterMax = ", iterMax, " | r = ", r)
-            vgPrime = deepcopy(vg); dPrime = deepcopy(d)
+            vgPrime = deepcopy(vg)
+            dPrime = deepcopy(d)
             temps = time()
             trial = 0
             H = (Vector{Int64})[]
@@ -694,13 +703,13 @@ function GM(fname::String,
             end
 
             if t1
-                println("   feasible \n")
+                println("   feasible")
                 distance = calcul_distance_2_points(L[k].y[1], L[k].y[2], vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2])
                 if (distance < best_distance)
-                    println("   A better projected solution found by VND!!!")
+                    println("   A projected solution found by VND!!! \n")
                     best_distance = distance
-                    best_solution = deepcopy((vgPrime,dPrime))
-                    iter = 1
+                    best_solution = deepcopy((vgPrime, dPrime))
+                    solutionNotFound = false
                 else
                     iter += 1
                 end
@@ -717,6 +726,7 @@ function GM(fname::String,
         d = best_solution[2]
     end
     println("")
+    =#
 
     # ==========================================================================
 
@@ -801,6 +811,12 @@ function GM(fname::String,
     legend(bbox_to_anchor = [1, 1], loc = 0, borderaxespad = 0, fontsize = "x-small")
     #PyPlot.title("Cone | 1 rounding | 2-$fname")
 
+    # Sauvegarde la figure
+    (figpath != "") ? savefig(figpath) : nothing
+
+    # Efface la figure pour que le prochain plot soit propre
+    (figpath != "") ? clf() : nothing
+
     # Compute the quality indicator of the bound set U generated ---------------
     # Need at least 2 points in EBP to compute the quality indicator
     if length(X_EBP) > 1
@@ -813,13 +829,43 @@ end
 # ==============================================================================
 # multi-instances in one run, the instances are took from "SPA/chosen_instances/"
 
-function GM_multi()
+function GM_multi(tailleSampling::Int64,
+    maxTrial::Int64,
+    maxTime::Int64
+    ;
+    redirect::Bool = false,
+    prefix::String = ""
+)
+    verbose ? println("Starting multi-instances run...\n") : nothing
+
     instances_dir = "../SPA/chosen_instances"
     filenames = getfname(instances_dir)
+
+    # Si on redirige les résultats vers des fichiers, on n'affiche pas les
+    # plots (ioff)
+    redirect ? ioff() : nothing
     for i in 1:length(filenames)
         instance = filenames[i][4:end]
-        GM(instance, 6, 20, 20)
+
+        file = split(instance, ".")[1]
+        logpath = prefix * "/log/" * file
+        errpath = prefix * "/err/" * file
+        figpath = prefix * "/fig/" * file
+
+        if redirect == true
+            print(file)
+            redirect_stdio(stdout = (logpath * ".log"), stderr = (errpath * ".err")) do
+                @time GM(instance, tailleSampling, maxTrial, maxTime, figpath = figpath * ".png")
+            end
+            println("   Done")
+        else
+            @time GM(instance, tailleSampling, maxTrial, maxTime)
+        end
     end
+    # On réactive l'affichage normal des plots
+    redirect ? ion() : nothing
+
+    verbose ? println("\nAll instances done.") : nothing
 end
 
 # ==============================================================================
@@ -829,6 +875,7 @@ function calcul_distance_2_points(x1,y1,x2,y2)
     return sqrt((x1-x2)^2 + (y1-y2)^2)
 end
 
+GM_multi(6, 20, typemax(Int64), redirect = true, prefix = "../output")
 #@time GM("sppaa02.txt", 6, 20, 20)
 #@time GM("sppnw03.txt", 6, 20, 20)
 #@time GM("sppnw10.txt", 6, 20, 20)

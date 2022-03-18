@@ -7,7 +7,7 @@ const verbose = true
 const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
 normalise = false
-projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
+projectionMode = 4    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random
@@ -591,7 +591,7 @@ function GM(fname::String,
     # ==========================================================================
 
     @printf("4) terraformation generateur par generateur \n\n")
-    #                                                  VERSION INITIALE
+    #=                                                  VERSION INITIALE
         nbIterTotal = 0
         nbgenNotFeasible = 0
         for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
@@ -649,28 +649,25 @@ function GM(fname::String,
         end
         #verbose ? @printf("   Nombre d'itération moyenne afin de trouver une solution admissible : %5.3f", nbIterTotal/nbgenNotFeasible) : nothing
         println("")
-    
+    =#
 
-    #=
+    #
     #----------------------------------VERSION VND---------------------------------
     for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
         println("----------------------------------------------------------")
-        iter = 1
-        iterMax = 5
         r = 1.00
-        best_distance = Inf
-        best_solution = (vg, d)
+        solution = (vg, d)
         solutionNotFound = true
+        temps = time()
         println("   First Rounding : ")
         roundingSolutionNew23!(vg, k, c1, c2, d) # un cone et LS sur generateur
         println("")
         println("   Starting VND :")
 
-        while (iter <= iterMax && solutionNotFound)
-            println("       iter = ", iter, " | iterMax = ", iterMax, " | r = ", r)
+        while (solutionNotFound)
+            println("       r = ", r, " | iterMax = ", maxTrial)
             vgPrime = deepcopy(vg)
             dPrime = deepcopy(d)
-            temps = time()
             trial = 0
             H = (Vector{Int64})[]
 
@@ -681,7 +678,7 @@ function GM(fname::String,
                 trial += 1
 
                 # projecting solution : met a jour sPrj, sInt, sFea dans vgPrime --------
-                projectingSolution!(vgPrime, k, A, c1, c2, λ1, λ2, dPrime, projectionMode, r)
+                projectingSolution!(vgPrime, k, A, c1, c2, λ1, λ2, dPrime, projectionMode; r = r)
                 println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
 
                 if !isFeasible(vgPrime, k)
@@ -704,29 +701,22 @@ function GM(fname::String,
 
             if t1
                 println("   feasible")
-                distance = calcul_distance_2_points(L[k].y[1], L[k].y[2], vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2])
-                if (distance < best_distance)
-                    println("   A projected solution found by VND!!! \n")
-                    best_distance = distance
-                    best_solution = deepcopy((vgPrime, dPrime))
-                    solutionNotFound = false
-                else
-                    iter += 1
-                end
+                println("   A projected solution found by VND!!! \n")
+                solution = deepcopy((vgPrime, dPrime))
+                solutionNotFound = false
             elseif t2
                 println("   maxTrial \n")
-                iter += 1
             elseif t3
                 println("   maxTime \n")
-                iter += 1
+                break
             end
             r += 0.01
         end
-        vg = best_solution[1]
-        d = best_solution[2]
+        vg = solution[1]
+        d = solution[2]
     end
     println("")
-    =#
+    #
 
     # ==========================================================================
 
@@ -875,8 +865,8 @@ function calcul_distance_2_points(x1,y1,x2,y2)
     return sqrt((x1-x2)^2 + (y1-y2)^2)
 end
 
-GM_multi(6, 20, typemax(Int64), redirect = true, prefix = "../output")
-#@time GM("sppaa02.txt", 6, 20, 20)
+GM_multi(6, 6, 20, redirect = true, prefix = "../output")
+#@time GM("sppaa02.txt", 6, 6, 20, figpath = "../output/fig/sppaa02")
 #@time GM("sppnw03.txt", 6, 20, 20)
 #@time GM("sppnw10.txt", 6, 20, 20)
 #@time GM("didactic5.txt", 5, 5, 10)

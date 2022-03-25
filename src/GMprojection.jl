@@ -68,7 +68,7 @@ end
 # version avec somme ponderee donnant la direction vers le generateur k
 
 function Δ2SPAbis17Fev(A::Array{Int,2}, xTilde::Array{Int,1},
-    c1::Array{Int,1}, c2::Array{Int,1}, k::Int64, λ1::Vector{Float64}, λ2::Vector{Float64}, r::Float64)
+    c1::Array{Int,1}, c2::Array{Int,1}, k::Int64, λ1::Vector{Float64}, λ2::Vector{Float64}, r::Float64, vg::Vector{tGenerateur})
 
     nbctr = size(A, 1)
     nbvar = size(A, 2)
@@ -81,8 +81,12 @@ function Δ2SPAbis17Fev(A::Array{Int,2}, xTilde::Array{Int,1},
     @objective(proj, Min, sum(cλ[i] * x[i] for i in idxTilde0) + sum(cλ[i] * (1 - x[i]) for i in idxTilde1))
     @constraint(proj, [i = 1:nbctr], (sum((x[j] * A[i, j]) for j in 1:nbvar)) == 1)
 
-    c1limit = sum(c1 .* xTilde) * r
-    c2limit = sum(c2 .* xTilde) * r
+    c1limit1 = sum(c1 .* xTilde) * r
+    c2limit1 = sum(c2 .* xTilde) * r
+    c1limit2 = vg[length(vg)].sRel.y[1]
+    c2limit2 = vg[1].sRel.y[2]
+    c1limit1 <= c1limit2 ? c1limit = c1limit1 : c1limit = c1limit2
+    c2limit1 <= c2limit2 ? c2limit = c2limit1 : c2limit = c2limit2
 
     @constraint(proj, sum(c1[i] * x[i] for i in 1:nbvar) <= c1limit)
     @constraint(proj, sum(c2[i] * x[i] for i in 1:nbvar) <= c2limit)
@@ -108,7 +112,7 @@ function projectingSolution!(vg::Vector{tGenerateur}, k::Int64,
     elseif projectionMode == 3
         fPrj, vg[k].sPrj.x = Δ2SPA_generateur(A,vg[k].sInt.x,c1,c2,k,λ1,λ2)
     elseif projectionMode == 4
-        fPrj, vg[k].sPrj.x = Δ2SPAbis17Fev(A,vg[k].sInt.x,c1,c2,k,λ1,λ2,r)
+        fPrj, vg[k].sPrj.x = Δ2SPAbis17Fev(A,vg[k].sInt.x,c1,c2,k,λ1,λ2,r,vg)
     end
 
     # Nettoyage de la valeur de vg[k].sPrj.x et calcul du point bi-objectif
@@ -141,7 +145,7 @@ function projectingSolution!(vg::Vector{tGenerateur}, k::Int64,
         vg[k].sInt.y[1] = vg[k].sPrj.y[1]
         vg[k].sInt.y[2] = vg[k].sPrj.y[2]
         vg[k].sFea = true
-        @printf("→ Admissible "); print("                       ")
+        @printf("→ Admissible "); print("                               ")
 
         # archive le point obtenu pour les besoins d'affichage
         if generateurVisualise == -1 
@@ -157,7 +161,7 @@ function projectingSolution!(vg::Vector{tGenerateur}, k::Int64,
     else
 
         vg[k].sFea = false
-        @printf("→ x          "); print("                       ")
+        @printf("→ x          "); print("                               ")
         # prepare pour l'iteration suivante
 #        vg[k].xRlx = deepcopy(vg[k].sPrj.x) !!!!!!!!!!!!!
 

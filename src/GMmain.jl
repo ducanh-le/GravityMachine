@@ -8,6 +8,7 @@ const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
 normalise = false
 projectionMode = 4    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
+vnd = true
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random
@@ -231,13 +232,13 @@ function inCone(pOrg, pDeb, pFin, pCur)
     cp_pDeb_pCur = (pDeb.x - pOrg.x) * (pCur.y - pOrg.y) - (pDeb.y - pOrg.y) * (pCur.x - pOrg.x)
     cp_pFin_pCur = (pFin.x - pOrg.x) * (pCur.y - pOrg.y) - (pFin.y - pOrg.y) * (pCur.x - pOrg.x)
 
-    if (cp_pDeb_pFin > 0)
+    if (cp_pDeb_pFin > 0)   #angle dep_org_fin <= 180
         if ((cp_pDeb_pCur >= 0) && (cp_pFin_pCur <= 0))
             return true
         else
             return false
         end
-    else
+    else    #angle dep_org_fin > 180
         if (!((cp_pDeb_pCur < 0) && (cp_pFin_pCur > 0)))
             return true
         else
@@ -591,7 +592,8 @@ function GM(fname::String,
     # ==========================================================================
 
     @printf("4) terraformation generateur par generateur \n\n")
-    #=                                                  VERSION INITIALE
+    if !vnd
+        #----------------------------------VERSION INITIALE---------------------------------
         nbIterTotal = 0
         nbgenNotFeasible = 0
         for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
@@ -607,7 +609,7 @@ function GM(fname::String,
             roundingSolutionNew23!(vg, k, c1, c2, d) # un cone et LS sur generateur
 
             push!(H, [vg[k].sInt.y[1], vg[k].sInt.y[2]])
-            println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
+            println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
 
             while !(t1 = isFeasible(vg, k)) && !(t2 = isFinished(trial, maxTrial)) && !(t3 = isTimeout(temps, maxTime))
 
@@ -615,7 +617,7 @@ function GM(fname::String,
 
                 # projecting solution : met a jour sPrj, sInt, sFea dans vg --------
                 projectingSolution!(vg, k, A, c1, c2, λ1, λ2, d, projectionMode)
-                println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
+                println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
 
                 if !isFeasible(vg, k)
 
@@ -623,7 +625,7 @@ function GM(fname::String,
                     #roundingSolution!(vg,k,c1,c2,d)
                     #roundingSolutionnew24!(vg,k,c1,c2,d)
                     roundingSolutionNew23!(vg, k, c1, c2, d)
-                    println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
+                    println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
 
                     # test detection cycle sur solutions entieres ------------------
                     cycle = [vg[k].sInt.y[1], vg[k].sInt.y[2]] in H
@@ -649,74 +651,170 @@ function GM(fname::String,
         end
         #verbose ? @printf("   Nombre d'itération moyenne afin de trouver une solution admissible : %5.3f", nbIterTotal/nbgenNotFeasible) : nothing
         println("")
-    =#
+    else#=
+        #----------------------------------VERSION VND---------------------------------
+        tempsGagner = 0.0
+        for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
+            println("----------------------------------------------------------")
+            r = 1.00
+            dr = 0.01
+            currentMaxTrial = maxTrial
+            solutionNotFound = true
+            temps = time()
+            tempsGagner < 0 ? tempsGagner = 0.0 : nothing
 
-    #
-    #----------------------------------VERSION VND---------------------------------
-    for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
-        println("----------------------------------------------------------")
-        r = 1.00
-        solution = (vg, d)
-        solutionNotFound = true
-        temps = time()
-        println("   First Rounding : ")
-        roundingSolutionNew23!(vg, k, c1, c2, d) # un cone et LS sur generateur
-        println("")
-        println("   Starting VND :")
+            println("   First Rounding : ")
+            roundingSolutionNew23!(vg, k, c1, c2, d) # un cone et LS sur generateur
+            println("")
+            println("   Starting VND :")
 
-        while (solutionNotFound)
-            println("       r = ", r, " | iterMax = ", maxTrial)
-            vgPrime = deepcopy(vg)
-            dPrime = deepcopy(d)
-            trial = 0
-            H = (Vector{Int64})[]
+            #gestion d'historique
+            H = [(Vector{Int64})[], (Vector{Int64})[], (Vector{Int64})[], (Vector{Int64})[]]
+            iH = 1
+            vgH = Vector{Vector{tGenerateur}}(undef, 4)
+            dH = Vector{tListDisplay}(undef, 4)
+            for i in 1:4
+                vgH[i] = deepcopy(vg)
+                dH[i] = deepcopy(d)
+            end
 
-            push!(H, [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]])
+            while (solutionNotFound)
+                println("       r = ", r, " | iterMax = ", currentMaxTrial, " | Time gain = ", tempsGagner, " | Time max = ", round(maxTime + tempsGagner))
+                vgPrime = vgH[iH]
+                dPrime = dH[iH]
+                trial = 0
 
-            while !(t1 = isFeasible(vgPrime, k)) && !(t2 = isFinished(trial, maxTrial)) && !(t3 = isTimeout(temps, maxTime))
+                push!(H[iH], [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]])
 
-                trial += 1
+                while !(t1 = isFeasible(vgPrime, k)) && !(t2 = isFinished(trial, currentMaxTrial)) && !(t3 = isTimeout(temps, maxTime + tempsGagner))
 
-                # projecting solution : met a jour sPrj, sInt, sFea dans vgPrime --------
-                projectingSolution!(vgPrime, k, A, c1, c2, λ1, λ2, dPrime, projectionMode; r = r)
-                println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
+                    trial += 1
 
-                if !isFeasible(vgPrime, k)
+                    # projecting solution : met a jour sPrj, sInt, sFea dans vgPrime --------
+                    projectingSolution!(vgPrime, k, A, c1, c2, λ1, λ2, dPrime, projectionMode; r=r)
+                    println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
 
-                    # rounding solution : met a jour sInt dans vgPrime --------------------------
-                    roundingSolutionNew23!(vgPrime, k, c1, c2, dPrime)
-                    println("   t=", trial, "  |  Tps=", round(time() - temps, digits = 4))
+                    if !isFeasible(vgPrime, k)
 
-                    # test detection cycle sur solutions entieres ------------------
-                    cycle = [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]] in H
-                    if (cycle == true)
-                        println("CYCLE!!!!!!!!!!!!!!!")
-                        # perturb solution
-                        perturbSolution30!(vgPrime, k, c1, c2, dPrime)
+                        # rounding solution : met a jour sInt dans vgPrime --------------------------
+                        roundingSolutionNew23!(vgPrime, k, c1, c2, dPrime)
+                        println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
+
+                        # test detection cycle sur solutions entieres ------------------
+                        cycle = [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]] in H[iH]
+                        if (cycle == true)
+                            println("CYCLE!!!!!!!!!!!!!!!")
+                            # perturb solution
+                            perturbSolution30!(vgPrime, k, c1, c2, dPrime)
+                        end
+                        push!(H[iH], [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]])
+
                     end
-                    push!(H, [vgPrime[k].sInt.y[1], vgPrime[k].sInt.y[2]])
+                end
 
+                if t1
+                    tempsGagner += maxTime - (time() - temps)
+                    println("   feasible")
+                    println("   A projected solution found by VND!!! \n")
+                    break
+                elseif t2
+                    println("   maxTrial \n")
+                elseif t3
+                    tempsGagner += maxTime - (time() - temps)
+                    println("   maxTime \n")
+                    break
+                end
+
+                #gestion de variables VND
+                if r < 1.06
+                    r += dr
+                    dr += 0.01
+                    iH += 1
+                else
+                    r = 1.00
+                    dr = 0.01
+                    iH = 1
                 end
             end
+            vg = vgH[iH]
+            d = dH[iH]
+            =#
+        #----------------------------------VERSION VND---------------------------------
+        tempsGagner = 0.0
+        for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
+            println("----------------------------------------------------------")
+            r = 1.00
+            dr = 0.01
+            currentMaxTrial = maxTrial
+            solutionNotFound = true
+            temps = time()
+            tempsGagner < 0 ? tempsGagner = 0.0 : nothing
 
-            if t1
-                println("   feasible")
-                println("   A projected solution found by VND!!! \n")
-                solution = deepcopy((vgPrime, dPrime))
-                solutionNotFound = false
-            elseif t2
-                println("   maxTrial \n")
-            elseif t3
-                println("   maxTime \n")
-                break
+            println("   First Rounding : ")
+            roundingSolutionNew25!(vg, k, c1, c2, d) # un cone et LS sur generateur
+            println("")
+            println("   Starting :")
+
+            #gestion d'historique
+            H = (Vector{Int64})[]
+
+            while (solutionNotFound)
+                println("       r = ", r, " | iterMax = ", currentMaxTrial, " | Time gain = ", tempsGagner, " | Time max = ", round(maxTime + tempsGagner))
+                trial = 0
+
+                push!(H, [vg[k].sInt.y[1], vg[k].sInt.y[2]])
+
+                while !(t1 = isFeasible(vg, k)) && !(t2 = isFinished(trial, currentMaxTrial)) && !(t3 = isTimeout(temps, maxTime + tempsGagner))
+
+                    trial += 1
+
+                    # projecting solution : met a jour sPrj, sInt, sFea dans vg --------
+                    projectingSolution!(vg, k, A, c1, c2, λ1, λ2, d, projectionMode; r=r)
+                    println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
+
+                    if !isFeasible(vg, k)
+
+                        # rounding solution : met a jour sInt dans vg --------------------------
+                        roundingSolutionNew25!(vg, k, c1, c2, d)
+                        println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
+
+                        # test detection cycle sur solutions entieres ------------------
+                        cycle = [vg[k].sInt.y[1], vg[k].sInt.y[2]] in H
+                        if (cycle == true)
+                            println("CYCLE!!!!!!!!!!!!!!!")
+                            # perturb solution
+                            perturbSolution30!(vg, k, c1, c2, d)
+                        end
+                        push!(H, [vg[k].sInt.y[1], vg[k].sInt.y[2]])
+
+                    end
+                end
+
+                if t1
+                    tempsGagner += maxTime - (time() - temps)
+                    println("   feasible")
+                    println("   A projected solution found!!! \n")
+                    break
+                elseif t2
+                    println("   maxTrial \n")
+                elseif t3
+                    tempsGagner += maxTime - (time() - temps)
+                    println("   maxTime \n")
+                    break
+                end
+
+                #gestion de variables VND
+                if r < 1.06
+                    r += dr
+                    dr += 0.01
+                else
+                    r = 1.00
+                    dr = 0.01
+                end
             end
-            r += 0.01
         end
-        vg = solution[1]
-        d = solution[2]
+        println("")
     end
-    println("")
-    #
 
     # ==========================================================================
 
@@ -865,10 +963,10 @@ function calcul_distance_2_points(x1,y1,x2,y2)
     return sqrt((x1-x2)^2 + (y1-y2)^2)
 end
 
-GM_multi(6, 6, 20, redirect = true, prefix = "../output")
-#@time GM("sppaa02.txt", 6, 6, 20, figpath = "../output/fig/sppaa02")
-#@time GM("sppnw03.txt", 6, 20, 20)
+#GM_multi(6, 6, 13, redirect = true, prefix = "../output")
+#@time GM("sppaa02.txt", 6, 6, 13, figpath = "../output/fig/sppaa02_solo")
+@time GM("sppnw03.txt", 6, 6, 13, figpath = "../output/fig/sppnw03_solo")
 #@time GM("sppnw10.txt", 6, 20, 20)
-#@time GM("didactic5.txt", 5, 5, 10)
+#@time GM("sppnw17.txt", 6, 6, 20, figpath = "../output/fig/sppnw17_solo")
 #@time GM("sppnw29.txt", 6, 30, 20)
 nothing

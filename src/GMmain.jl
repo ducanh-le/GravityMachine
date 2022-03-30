@@ -7,8 +7,8 @@ const verbose = true
 const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
 normalise = false
-projectionMode = 4    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
-vnd = true
+projectionMode = 1    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
+vnd = false
 
 println("-) Active les packages requis\n")
 using JuMP, GLPK, PyPlot, Printf, Random
@@ -587,6 +587,8 @@ function GM(fname::String,
         else
             λ1, λ2 = calculerDirections_generateur(L, vg)
         end
+    else
+        λ1, λ2 = Vector{Float64}(undef, nbgen), Vector{Float64}(undef, nbgen)
     end
 
     # ==========================================================================
@@ -964,8 +966,8 @@ function calcul_distance_2_points(x1,y1,x2,y2)
 end
 
 #GM_multi(6, 6, 13, redirect = true, prefix = "../output")
-#@time GM("sppaa02.txt", 6, 6, 13, figpath = "../output/fig/sppaa02_solo")
-@time GM("sppnw03.txt", 6, 6, 13, figpath = "../output/fig/sppnw03_solo")
+@time GM("sppaa02.txt", 6, 20, 20, figpath = "../output/fig/sppaa02_solo")
+#@time GM("sppnw03.txt", 6, 6, 13, figpath = "../output/fig/sppnw03_solo")
 #@time GM("sppnw10.txt", 6, 20, 20)
 #@time GM("sppnw17.txt", 6, 6, 20, figpath = "../output/fig/sppnw17_solo")
 #@time GM("sppnw29.txt", 6, 30, 20)

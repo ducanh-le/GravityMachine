@@ -6,8 +6,8 @@ println("""\nAlgorithme "Gravity machine" --------------------------------\n""")
 const verbose = true
 const graphic = true
 generateurVisualise = -1    # -1: afficher tous les generateur      k: afficher generateur k
-normalise = false
-projectionMode = 1    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
+normaliseMode = -1     # -1: normal           1: normaliser le ratio entre Δz1 et Δz2         2: normaliser l'espace d'objectif
+projectionMode = 3    # 1: version 2005      2: vers point milieu     3: vers generateur     4: vers generateur avec norme-L1
 vnd = false
 
 println("-) Active les packages requis\n")
@@ -576,13 +576,13 @@ function GM(fname::String,
     # calcule les directions (λ1,λ2) pour chaque generateur a utiliser lors des projections
 
     if projectionMode == 2
-        if normalise
+        if normaliseMode == 2
             λ1, λ2 = calculerDirections_milieu_normalise(L, vg)
         else
             λ1, λ2 = calculerDirections_milieu(L, vg)
         end
     elseif projectionMode == 3 || projectionMode == 4
-        if normalise
+        if normaliseMode == 2
             λ1, λ2 = calculerDirections_generateur_normalise(L, vg)
         else
             λ1, λ2 = calculerDirections_generateur(L, vg)
@@ -618,7 +618,7 @@ function GM(fname::String,
                 trial += 1
 
                 # projecting solution : met a jour sPrj, sInt, sFea dans vg --------
-                projectingSolution!(vg, k, A, c1, c2, λ1, λ2, d, projectionMode)
+                projectingSolution!(vg, k, A, c1, c2, λ1, λ2, d, projectionMode, normaliseMode)
                 println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
 
                 if !isFeasible(vg, k)
@@ -654,7 +654,7 @@ function GM(fname::String,
         #verbose ? @printf("   Nombre d'itération moyenne afin de trouver une solution admissible : %5.3f", nbIterTotal/nbgenNotFeasible) : nothing
         println("")
     else#=
-        #----------------------------------VERSION VND---------------------------------
+        #----------------------------------VERSION VND MULTI HISTORIQUE---------------------------------
         tempsGagner = 0.0
         for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
             println("----------------------------------------------------------")
@@ -741,7 +741,7 @@ function GM(fname::String,
             vg = vgH[iH]
             d = dH[iH]
             =#
-        #----------------------------------VERSION VND---------------------------------
+        #----------------------------------VERSION VND HISTORIQUE COMMUN---------------------------------
         tempsGagner = 0.0
         for k in [i for i in 1:nbgen if !isFeasible(vg, i)]
             println("----------------------------------------------------------")
@@ -771,7 +771,7 @@ function GM(fname::String,
                     trial += 1
 
                     # projecting solution : met a jour sPrj, sInt, sFea dans vg --------
-                    projectingSolution!(vg, k, A, c1, c2, λ1, λ2, d, projectionMode; r=r)
+                    projectingSolution!(vg, k, A, c1, c2, λ1, λ2, d, projectionMode, normaliseMode; r=r)
                     println("   t=", trial, "  |  Tps=", round(time() - temps, digits=4))
 
                     if !isFeasible(vg, k)
@@ -844,7 +844,7 @@ function GM(fname::String,
     # ==========================================================================
     @printf("6) Edition des resultats \n\n")
 
-    normalise ? displayPoint = normaliserDisplay(L, d) : displayPoint = d
+    normaliseMode == 2 ? displayPoint = normaliserDisplay(L, d) : displayPoint = d
 
     #    figure("Gravity Machine",figsize=(6.5,5))
     #xlim(25000,45000)
@@ -854,7 +854,7 @@ function GM(fname::String,
     # Donne les points relaches initiaux ---------------------------------------
     #    scatter(d.xLf1,d.yLf1,color="blue", marker="x")
     #    scatter(d.xLf2,d.yLf2,color="red", marker="+")
-    graphic ? scatter(displayPoint.xL, displayPoint.yL, color = "blue", marker = "x", label = L"y \in L") : nothing
+    graphic ? scatter(displayPoint.xL, displayPoint.yL, color = "blue", marker = "x", label = L"y \in \bar{Y}") : nothing
 
     # Donne les points entiers -------------------------------------------------
     graphic ? scatter(displayPoint.XInt, displayPoint.YInt, color = "orange", marker = "s", label = L"y" * " rounded") : nothing
@@ -867,14 +867,14 @@ function GM(fname::String,
     #    @show d.YProj
 
     # Donne les points admissibles ---------------------------------------------
-    graphic ? scatter(displayPoint.XFeas, displayPoint.YFeas, color = "green", marker = "o", label = L"y \in F") : nothing
+    graphic ? scatter(displayPoint.XFeas, displayPoint.YFeas, color = "green", marker = "o", label = L"y \in Y") : nothing
     #    @show d.XFeas
     #    @show d.YFeas
 
     # Donne l'ensemble bornant primal obtenu + la frontiere correspondante -----
     #--> TODO : stocker l'EBP dans U proprement
     X_EBP_frontiere, Y_EBP_frontiere, X_EBP, Y_EBP = ExtractEBP(d.XFeas, d.YFeas)
-    if normalise
+    if normaliseMode == 2
         X_EBP_frontiere_display, Y_EBP_frontiere_display = normaliserVectorPoint(L, X_EBP_frontiere, Y_EBP_frontiere)
         X_EBP_display, Y_EBP_display = normaliserVectorPoint(L, X_EBP, Y_EBP)
     else
@@ -890,7 +890,7 @@ function GM(fname::String,
 
     # Donne les points non-domines exacts de cette instance --------------------
     XN, YN = loadNDPoints2SPA(fname)
-    normalise ? (XNdisplay, YNdisplay) = normaliserVectorPoint(L, XN, YN) : (XNdisplay, YNdisplay) = (XN, YN)
+    normaliseMode == 2 ? (XNdisplay, YNdisplay) = normaliserVectorPoint(L, XN, YN) : (XNdisplay, YNdisplay) = (XN, YN)
 
     plot(XNdisplay, YNdisplay, color = "black", linewidth = 0.75, marker = "+", markersize = 1.0, linestyle = ":", label = L"y \in Y_N")
     scatter(XNdisplay, YNdisplay, color = "black", marker = "+")
@@ -902,7 +902,7 @@ function GM(fname::String,
     #PyPlot.title("Cone | 1 rounding | 2-$fname")
 
     # Sauvegarde la figure
-    (figpath != "") ? savefig(figpath) : nothing
+    (figpath != "") ? savefig(fname=figpath, dpi=500, papertype="a4") : nothing
 
     # Efface la figure pour que le prochain plot soit propre
     (figpath != "") ? clf() : nothing
@@ -966,9 +966,9 @@ function calcul_distance_2_points(x1,y1,x2,y2)
 end
 
 #GM_multi(6, 6, 13, redirect = true, prefix = "../output")
-@time GM("sppaa02.txt", 6, 20, 20, figpath = "../output/fig/sppaa02_solo")
+#@time GM("sppaa02.txt", 6, 20, 20, figpath = "../output/fig/sppaa02_solo")
 #@time GM("sppnw03.txt", 6, 6, 13, figpath = "../output/fig/sppnw03_solo")
 #@time GM("sppnw10.txt", 6, 20, 20)
-#@time GM("sppnw17.txt", 6, 6, 20, figpath = "../output/fig/sppnw17_solo")
+@time GM("sppnw17.txt", 6, 20, 20, figpath = "../output/fig/sppnw17_solo")
 #@time GM("sppnw29.txt", 6, 30, 20)
 nothing

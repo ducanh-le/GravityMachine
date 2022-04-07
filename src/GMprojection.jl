@@ -100,7 +100,24 @@ end
 function projectingSolution!(vg::Vector{tGenerateur}, k::Int64, 
                              A::Array{Int,2}, c1::Array{Int,1}, c2::Array{Int,1}, 
                              λ1::Vector{Float64}, λ2::Vector{Float64},
-                             d::tListDisplay, projectionMode::Int64; r::Float64 = 1.0)
+                             d::tListDisplay, projectionMode::Int64, normaliseMode::Int64; r::Float64 = 1.0)
+
+    # --------------------------------------------------------------------------
+    # --- biaise les coef de la fct obj i presentant le plus faible range sur zi dans Y ---17/2
+    if normaliseMode == 1
+        # delta sur les 2 etendues de la valeur des points dans l'espace des objectifs
+        Δz1 = max(vg[1].sRel.y[1], vg[end].sRel.y[1]) - min(vg[1].sRel.y[1], vg[end].sRel.y[1])
+        Δz2 = max(vg[1].sRel.y[2], vg[end].sRel.y[2]) - min(vg[1].sRel.y[2], vg[end].sRel.y[2])    
+        # ratio entre les 2 etendues
+        rz1=max(Δz1,Δz2)/Δz1
+        rz2=max(Δz1,Δz2)/Δz2       
+        # vecteur des couts biaises
+        c1prime = round.(Int64,c1*rz1)
+        c2prime = round.(Int64,c2*rz2)
+    else
+        c1prime = c1
+        c2prime = c2
+    end
 
     # --------------------------------------------------------------------------
     # Projete la solution entiere sur le polytope X 
@@ -110,7 +127,7 @@ function projectingSolution!(vg::Vector{tGenerateur}, k::Int64,
     elseif projectionMode == 2
         fPrj, vg[k].sPrj.x = Δ2SPA_milieu(A,vg,c1,c2,k,λ1,λ2)
     elseif projectionMode == 3
-        fPrj, vg[k].sPrj.x = Δ2SPA_generateur(A,vg[k].sInt.x,c1,c2,k,λ1,λ2)
+        fPrj, vg[k].sPrj.x = Δ2SPA_generateur(A,vg[k].sInt.x,c1prime,c2prime,k,λ1,λ2)
     elseif projectionMode == 4
         fPrj, vg[k].sPrj.x = Δ2SPAbis17Fev(A,vg[k].sInt.x,c1,c2,k,λ1,λ2,r,vg)
     end
